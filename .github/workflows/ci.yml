@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    name: Lint · Security · Imports
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff pip-audit
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Security audit (pip-audit)
+        run: pip-audit -r requirements.txt
+
+      - name: Validate imports
+        run: |
+          python -c "from wordCount.word_analyzer import analyze_content, analyze_file"
+          python -c "from wordCount.word_counter_ui import render_word_counter_tab"
+          python -c "from pdfReviewer.core import render_pdf_first_page, extract_text, build_prompt, parse_issues"
+          python -c "from pdfReviewer.llm_providers import get_provider, ProviderError"
+
+      - name: Check for hardcoded secrets
+        run: |
+          if grep -rn "sk-ant-\|sk-proj-\|AIza\|-----BEGIN" --include="*.py" .; then
+            echo "Hardcoded secret detected — aborting."
+            exit 1
+          fi
+          echo "No hardcoded secrets found."
